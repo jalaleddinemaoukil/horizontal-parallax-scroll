@@ -1,9 +1,9 @@
 # Horizontal Parallax Gallery
 
-> **Stack:** HTML · CSS · JavaScript · GSAP (CDN)  
-> **No build tools. No frameworks. Open `index.html` in a browser and it works.**
+> **Stack:** Vue 3 · Vite · GSAP · pnpm  
+> **Composition API · Single File Components · Scoped CSS**
 
-You will build this completely from scratch. Each lesson explains the concept first, then tells you exactly what to write. Don't copy-paste — type it out.
+You will build this completely from scratch using Vue 3. Each lesson explains the concept first, then tells you exactly what to write. Don't copy-paste — type it out.
 
 ---
 
@@ -13,12 +13,13 @@ You will build this completely from scratch. Each lesson explains the concept fi
 2. [Project Setup](#2-project-setup)
 3. [Lesson 1 — Lerp: The Secret Behind Smooth Motion](#3-lesson-1--lerp-the-secret-behind-smooth-motion)
 4. [Lesson 2 — The CSS Parallax Buffer](#4-lesson-2--the-css-parallax-buffer)
-5. [Lesson 3 — The HTML](#5-lesson-3--the-html)
-6. [Lesson 4 — The CSS](#6-lesson-4--the-css)
-7. [Lesson 5 — Smooth Horizontal Scroll](#7-lesson-5--smooth-horizontal-scroll)
-8. [Lesson 6 — The Parallax Effect](#8-lesson-6--the-parallax-effect)
-9. [Lesson 7 — Wire Everything Up](#9-lesson-7--wire-everything-up)
-10. [Tuning Reference](#10-tuning-reference)
+5. [Lesson 3 — Vue Concepts You'll Use](#5-lesson-3--vue-concepts-youll-use)
+6. [Lesson 4 — The Template](#6-lesson-4--the-template)
+7. [Lesson 5 — Global CSS and Scoped Styles](#7-lesson-5--global-css-and-scoped-styles)
+8. [Lesson 6 — Smooth Horizontal Scroll in Vue](#8-lesson-6--smooth-horizontal-scroll-in-vue)
+9. [Lesson 7 — The Parallax Effect](#9-lesson-7--the-parallax-effect)
+10. [Lesson 8 — Wire Everything Up](#10-lesson-8--wire-everything-up)
+11. [Tuning Reference](#11-tuning-reference)
 
 ---
 
@@ -31,22 +32,74 @@ A full-screen horizontal gallery where:
 - Each image shifts slightly as it moves through the viewport — **parallax depth**
 - Everything runs at 60fps using **GPU-accelerated CSS transforms**
 
-No WebGL. No canvas. Just `translateX` done right.
+No WebGL. No canvas. Just `translateX` done right — now inside a Vue 3 Single File Component.
 
 ---
 
 ## 2. Project Setup
 
-Create the following three empty files in this folder:
+### Scaffold with pnpm
+
+Run this in your terminal. Answer the prompts as shown:
+
+```bash
+pnpm create vue@latest
+```
+
+```
+✔ Project name: horizontal-parallax-scroll
+✔ Add TypeScript? › No
+✔ Add JSX Support? › No
+✔ Add Vue Router? › No
+✔ Add Pinia? › No
+✔ Add Vitest? › No
+✔ Add an End-to-End Testing Solution? › No
+✔ Add ESLint? › Yes
+✔ Add Prettier? › Yes
+✔ Add Vue DevTools? › No
+```
+
+Then install dependencies and install GSAP:
+
+```bash
+cd horizontal-parallax-scroll
+pnpm install
+pnpm add gsap
+```
+
+Start the dev server:
+
+```bash
+pnpm dev
+```
+
+### Clean up the scaffold
+
+Delete everything Vue generated that you don't need:
+
+```bash
+rm -rf src/assets src/components/HelloWorld.vue src/components/TheWelcome.vue src/components/WelcomeItem.vue src/components/icons
+```
+
+### Project structure you'll end up with
 
 ```
 horizontal-parallax-scroll/
+├── public/
+│   └── images/              ← move your images here
+├── src/
+│   ├── components/
+│   │   └── GalleryParallax.vue
+│   ├── styles/
+│   │   └── global.css
+│   ├── App.vue
+│   └── main.js
 ├── index.html
-├── style.css
-└── main.js
+├── package.json
+└── vite.config.js
 ```
 
-That's it. You'll fill each one as you go through the lessons.
+Move your images into `public/images/`. Vite serves `public/` at the root, so `src="/images/Serene Sand Dunes.png"` will work in the template.
 
 ---
 
@@ -127,121 +180,187 @@ Max safe shift:  10%          (of image width = 12.5% of card width)
 
 Keep these numbers in your head as you write the CSS and JS.
 
----
 
-## 5. Lesson 3 — The HTML
+## 5. Lesson 3 — Vue Concepts You'll Use
 
-**File: `index.html`**
+**Read this before writing any Vue code.**
 
-Open `index.html` and write the following structure. Each piece is explained inline.
+You're using Vue 3 with the **Composition API** and **Single File Components (SFCs)**. Here's what that means for this project.
 
-```html
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Horizontal Parallax Gallery</title>
-  <link rel="stylesheet" href="style.css" />
-</head>
-<body>
+### Single File Component structure
+
+Every `.vue` file has three sections:
+
+```vue
+<script setup>
+  // JavaScript logic — runs once when the component mounts
+  // "setup" means you don't need to export anything — Vue handles it
+</script>
+
+<template>
+  <!-- HTML markup — Vue compiles this to DOM operations -->
+</template>
+
+<style scoped>
+  /* CSS — "scoped" means it only applies to this component */
+  /* Vue adds a unique attribute (e.g. data-v-7ba5bd90) to scope it */
+</style>
 ```
 
-Now the gallery structure. Three layers:
+### Template refs — how you get DOM elements
 
-```html
+In plain JS you'd write `document.querySelector('.gallery__track')`. In Vue, you use `ref` and bind it with the `ref` attribute in the template:
+
+```vue
+<script setup>
+import { ref } from 'vue'
+
+const trackRef = ref(null)   // starts as null
+</script>
+
+<template>
+  <!-- Vue fills trackRef.value with the DOM element after mount -->
+  <div ref="trackRef"></div>
+</template>
+```
+
+After `onMounted` fires, `trackRef.value` is the actual `<div>` DOM element. Before that, it's `null`.
+
+### v-for — rendering a list
+
+Instead of copy-pasting five `<div class="gallery__item">` blocks, you drive them from a data array:
+
+```vue
+<script setup>
+const images = [
+  { src: '/images/Serene Sand Dunes.png', alt: 'Serene Sand Dunes' },
+  // ...
+]
+</script>
+
+<template>
+  <div v-for="(image, i) in images" :key="i" class="gallery__item">
+    <img :src="image.src" :alt="image.alt" />
+  </div>
+</template>
+```
+
+`:src` and `:alt` are shorthand for `v-bind:src` and `v-bind:alt` — they evaluate the expression as JavaScript, not a plain string.
+
+### Collecting multiple refs with v-for
+
+You need a ref to each `<img>` element, not just one. The pattern is a ref array + a callback:
+
+```vue
+<script setup>
+import { ref } from 'vue'
+
+const imageRefs = ref([])
+</script>
+
+<template>
+  <img
+    v-for="(image, i) in images"
+    :key="i"
+    :ref="el => { if (el) imageRefs.value[i] = el }"
+  />
+</template>
+```
+
+Vue calls the function for each item. After mount, `imageRefs.value` is an array of DOM elements.
+
+### onMounted and onUnmounted — lifecycle hooks
+
+GSAP needs real DOM elements. You can only access them after Vue has rendered. `onMounted` fires right after:
+
+```js
+import { onMounted, onUnmounted } from 'vue'
+
+onMounted(() => {
+  // DOM is ready — attach GSAP, add event listeners
+})
+
+onUnmounted(() => {
+  // Component is being torn down — remove listeners, kill ticker
+  // Without this, event listeners and ticker callbacks leak memory
+})
+```
+
+`onUnmounted` is the cleanup hook. In a real app the gallery component might get unmounted (e.g. navigating to another route). Always clean up.
+
+> **Why not use `reactive()` for `scroll`?**  
+> The `scroll` object is updated 60 times per second by GSAP. Vue's reactivity system would trigger re-renders on every change. You don't want that — GSAP owns the DOM updates here. A plain `{}` object is intentional: it's invisible to Vue's reactivity.
+
+---
+
+## 6. Lesson 4 — The Template
+
+**File: `src/components/GalleryParallax.vue`** — create this file.
+
+Start with the `<template>` block. Three layers, same as before — but now the image list is data-driven.
+
+```vue
+<template>
   <!-- Layer 1: the viewport window -->
-  <div class="gallery__wrapper">
+  <div class="gallery__wrapper" ref="wrapperRef">
 
     <!-- Layer 2: the horizontal strip that moves -->
-    <div class="gallery__track">
+    <div class="gallery__track" ref="trackRef">
 
-      <!-- Layer 3: one card per image -->
-      <div class="gallery__item">
+      <!-- Layer 3: one card per image — v-for replaces repeated markup -->
+      <div
+        v-for="(image, i) in images"
+        :key="i"
+        class="gallery__item"
+      >
         <img
-          src="https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=800&q=80"
-          alt="Mountain landscape"
-          draggable="false"
-        />
-      </div>
-
-      <div class="gallery__item">
-        <img
-          src="https://images.unsplash.com/photo-1469474968028-56623f02e42e?w=800&q=80"
-          alt="Forest path"
-          draggable="false"
-        />
-      </div>
-
-      <div class="gallery__item">
-        <img
-          src="https://images.unsplash.com/photo-1500534314209-a25ddb2bd429?w=800&q=80"
-          alt="Ocean view"
-          draggable="false"
-        />
-      </div>
-
-      <div class="gallery__item">
-        <img
-          src="https://images.unsplash.com/photo-1447752875215-b2761acb3c5d?w=800&q=80"
-          alt="Autumn trees"
-          draggable="false"
-        />
-      </div>
-
-      <div class="gallery__item">
-        <img
-          src="https://images.unsplash.com/photo-1464822759023-fed622ff2c3b?w=800&q=80"
-          alt="Mountain peaks"
-          draggable="false"
-        />
-      </div>
-
-      <div class="gallery__item">
-        <img
-          src="https://images.unsplash.com/photo-1682687221038-404cb8830901?w=800&q=80"
-          alt="Desert dunes"
+          :ref="el => { if (el) imageRefs[i] = el }"
+          :src="image.src"
+          :alt="image.alt"
           draggable="false"
         />
       </div>
 
     </div>
   </div>
+</template>
 ```
 
-Close with GSAP from CDN and your script:
+**What changed from plain HTML:**
 
-```html
-  <!-- GSAP from CDN — no npm, no bundler -->
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/gsap/3.12.5/gsap.min.js"></script>
-  <script src="main.js"></script>
-</body>
-</html>
-```
-
-**What each class does:**
-
-| Class | Role |
+| Old (HTML) | New (Vue) |
 |---|---|
-| `.gallery__wrapper` | Full-screen viewport. `overflow: hidden` clips the moving track. |
-| `.gallery__track` | Horizontal strip. This is the element you'll `translateX`. |
-| `.gallery__item` | Individual card. Has `overflow: hidden` — the parallax "window". |
-| `img` | The image. Will be 125% wide with room to shift. |
+| Five `<div class="gallery__item">` blocks | One block with `v-for` |
+| `id="wrapper"` + `querySelector` | `ref="wrapperRef"` |
+| `<script src="gsap.min.js">` CDN tag | `import gsap from 'gsap'` in script |
+| `document.querySelectorAll('img')` | `imageRefs` array filled by `:ref` callback |
 
-> **Why `draggable="false"`?**  
-> Without it, clicking and dragging an image triggers the browser's native "drag image" ghost. This interrupts your scroll events.
+Add the image data in `<script setup>` (you'll build the full script section in Lesson 6):
 
-**Checkpoint:** Open `index.html` in a browser. You should see unstyled images stacked vertically. It looks wrong — that's expected. CSS fixes that next.
+```js
+const images = [
+  { src: '/images/Serene Sand Dunes.png',              alt: 'Serene Sand Dunes' },
+  { src: '/images/Serene Coastal Reflection.png',      alt: 'Serene Coastal Reflection' },
+  { src: '/images/Dramatic Mountain Landscape.png',    alt: 'Dramatic Mountain Landscape' },
+  { src: '/images/Misty Tropical Rainforest.png',      alt: 'Misty Tropical Rainforest' },
+  { src: '/images/Abstract Cityscape Night.png',       alt: 'Abstract Cityscape Night' },
+]
+```
+
+> **Why `/images/...` and not `./images/...`?**  
+> Vite serves the `public/` folder at the root `/`. A leading `/` means "from the server root" — it always works regardless of which route you're on. `./images/...` is a relative import path and would break inside `src/`.
+
+**Checkpoint:** Add `<GalleryParallax />` to `src/App.vue` and visit `localhost:5173`. You should see unstyled images stacked. That's expected — styles come next.
 
 ---
 
-## 6. Lesson 4 — The CSS
+## 7. Lesson 5 — Global CSS and Scoped Styles
 
-**File: `style.css`**
+Two CSS files. Different jobs.
 
-Write each block and read the comment above it before moving on.
+### `src/styles/global.css` — the reset
 
-### Reset and base
+Create this file. It touches `html` and `body` — things that exist outside any component, so they can't be scoped.
 
 ```css
 *, *::before, *::after {
@@ -256,7 +375,7 @@ html, body {
   /*
     Disable native scroll entirely.
     You're replacing it with your own system in JS.
-    Without this, the browser would scroll the page AND your gallery scrolls —
+    Without this, the browser would scroll the page AND the gallery —
     causing a double-scroll bug.
   */
   overflow: hidden;
@@ -265,25 +384,36 @@ html, body {
 }
 ```
 
-### The wrapper — your viewport window
+Import it in `src/main.js`:
 
-```css
+```js
+import { createApp } from 'vue'
+import './styles/global.css'
+import App from './App.vue'
+
+createApp(App).mount('#app')
+```
+
+### `<style scoped>` in `GalleryParallax.vue`
+
+Add this at the bottom of the component. Same rules as before — the only difference is `scoped` prevents these styles from leaking into other components.
+
+```vue
+<style scoped>
+/* The viewport window */
 .gallery__wrapper {
   width: 100vw;
   height: 100vh;
-  overflow: hidden;       /* Clips anything outside the viewport */
+  overflow: hidden;
   display: flex;
-  align-items: center;    /* Cards are vertically centered */
+  align-items: center;
 }
-```
 
-### The track — what you'll translateX
-
-```css
+/* The horizontal strip — what you'll translateX */
 .gallery__track {
-  display: flex;          /* Side-by-side layout */
+  display: flex;
   gap: 1.5rem;
-  padding: 0 5vw;         /* Side breathing room */
+  padding: 0 5vw;
   /*
     will-change: transform tells the browser this element transforms frequently.
     The browser promotes it to its own GPU compositor layer.
@@ -292,257 +422,194 @@ html, body {
   */
   will-change: transform;
 }
-```
 
-### The card — the parallax "window"
-
-```css
+/* The card — the parallax "window" */
 .gallery__item {
-  flex-shrink: 0;         /* Don't let flex crush the cards */
+  flex-shrink: 0;
   width: 38vw;
   height: 58vh;
   /*
-    THIS IS THE CRITICAL LINE.
     The image inside is 125% wide.
     Without overflow: hidden, you'd see image edges bleeding out of the card.
-    With it, the card acts as a clipping mask — only the centered portion is visible.
+    With it, the card acts as a clipping mask.
   */
   overflow: hidden;
   border-radius: 6px;
 }
-```
 
-### The image — the parallax buffer
-
-```css
+/* The image — the parallax buffer */
 .gallery__item img {
   display: block;
-
   /*
     Make the image wider than its container.
     Extra width = 25% (12.5% hidden on each side).
     This is the physical space JS will shift the image into.
   */
   width: 125%;
-
   height: 100%;
-
   /*
     Center the oversized image.
     Formula: -(width - 100%) / 2 = -(125 - 100) / 2 = -12.5%
-    Without this, the image would start flush left and only extend to the right.
   */
   margin-left: -12.5%;
-
-  object-fit: cover;      /* Prevent distortion as dimensions vary */
-  will-change: transform; /* GPU layer hint for per-image transforms */
+  object-fit: cover;
+  will-change: transform;
   pointer-events: none;
   user-select: none;
 }
+</style>
 ```
 
-**Checkpoint:** Refresh `index.html`. You should now see a horizontal row of images, all clipped inside their cards, centered on screen. Scrolling does nothing yet — that's Lesson 5.
+**Checkpoint:** Refresh. You should now see a horizontal row of images, all clipped inside their cards, centered on screen. Scrolling does nothing yet — that's Lesson 6.
 
 ---
 
-## 7. Lesson 5 — Smooth Horizontal Scroll
+## 8. Lesson 6 — Smooth Horizontal Scroll in Vue
 
-**File: `main.js`**
+Now build the `<script setup>` block in `GalleryParallax.vue`. The logic is identical to what you'd write in plain JS — the difference is *where* it runs (inside `onMounted`) and *how* you access the DOM (via `ref`).
 
-Start writing `main.js`. Build it section by section.
-
-### Grab your elements
+### Imports and refs
 
 ```js
-const wrapper = document.querySelector('.gallery__wrapper')
-const track   = document.querySelector('.gallery__track')
-const images  = document.querySelectorAll('.gallery__item img')
+import { ref, onMounted, onUnmounted } from 'vue'
+import gsap from 'gsap'
+
+// DOM refs — populated after mount
+const wrapperRef = ref(null)
+const trackRef   = ref(null)
+const imageRefs  = []          // plain array — no reactivity needed, GSAP owns this
+
+// Image data
+const images = [
+  { src: '/images/Serene Sand Dunes.png',           alt: 'Serene Sand Dunes' },
+  { src: '/images/Serene Coastal Reflection.png',   alt: 'Serene Coastal Reflection' },
+  { src: '/images/Dramatic Mountain Landscape.png', alt: 'Dramatic Mountain Landscape' },
+  { src: '/images/Misty Tropical Rainforest.png',   alt: 'Misty Tropical Rainforest' },
+  { src: '/images/Abstract Cityscape Night.png',    alt: 'Abstract Cityscape Night' },
+]
 ```
 
-### Import the GSAP clamp utility
+### Scroll state and constants
+
+Same as in plain JS — a plain object, invisible to Vue reactivity:
 
 ```js
-// gsap.utils.clamp(min, max, value) — keeps a value within a range.
-// Prevents scrolling before the start or past the last image.
 const clamp = gsap.utils.clamp
-```
 
-### Define scroll state
-
-```js
-/*
-  This object is the heart of the scroll system.
-
-  current → where the track physically is right now (px)
-  target  → where we WANT the track to be (px)
-  ease    → the lerp factor (how fast current chases target)
-  limit   → max scrollable distance, calculated from the DOM
-*/
 const scroll = {
   current: 0,
   target:  0,
   ease:    0.07,
   limit:   0,
 }
+
+const MAX_SHIFT = 10
 ```
 
-### Calculate the scroll limit
+### setLimit
 
 ```js
 /*
   How far can we scroll?
   Total track width minus what's already visible in the viewport.
-
-  Example:
-    track.scrollWidth = 4000px (all images + gaps)
-    wrapper.clientWidth = 1440px (viewport)
-    limit = 2560px — we can scroll 2560px before running out of content
+  .value unwraps the ref to get the underlying DOM element.
 */
 function setLimit() {
-  scroll.limit = track.scrollWidth - wrapper.clientWidth
+  scroll.limit = trackRef.value.scrollWidth - wrapperRef.value.clientWidth
 }
 ```
 
-### Capture wheel input
+### onMounted — where everything starts
+
+Inside `onMounted`, the DOM is real. Create the quickSetters, register the ticker, and attach event listeners:
 
 ```js
-/*
-  When the user scrolls the wheel (vertical), add the delta to our target.
-  We're deliberately converting vertical wheel movement into horizontal travel.
+// Store references so onUnmounted can remove them
+let tickerCb
+let wheelCb
+let resizeCb
 
-  { passive: true } — we promise not to call e.preventDefault() here.
-  This lets the browser skip a blocking check on every scroll event.
-*/
-window.addEventListener('wheel', (e) => {
-  scroll.target += e.deltaY
-}, { passive: true })
-```
+onMounted(() => {
+  // quickSetter returns a plain function — faster than gsap.set per frame
+  const setTrackX = gsap.quickSetter(trackRef.value, 'x', 'px')
+  const setImageX = imageRefs.map(img => gsap.quickSetter(img, 'x', '%'))
 
-### The render loop
-
-```js
-/*
-  gsap.ticker.add() fires on every animation frame — like requestAnimationFrame,
-  but synced with GSAP's internal clock for better accuracy across devices.
-
-  Every frame:
-    1. Clamp target so it never goes below 0 or above the limit
-    2. Lerp current toward target
-    3. Apply the result as translateX to the track
-*/
-gsap.ticker.add(() => {
-  scroll.target = clamp(0, scroll.limit, scroll.target)
-
-  // Apply lerp: current += (target - current) * ease
-  scroll.current += (scroll.target - scroll.current) * scroll.ease
-
-  // Negative because we move the track LEFT as scroll increases
-  gsap.set(track, { x: -scroll.current })
-})
-
-/*
-  Disable lag smoothing.
-
-  GSAP normally compensates for large time gaps between frames
-  (e.g. when a tab was hidden and becomes active again).
-  With lag smoothing ON, a hidden tab re-appearing can cause the gallery
-  to "catch up" — a violent single-frame jump.
-  Setting it to 0 disables this behavior.
-*/
-gsap.ticker.lagSmoothing(0)
-```
-
-### Handle resize
-
-```js
-window.addEventListener('resize', () => {
   setLimit()
-}, { passive: true })
+
+  // The render loop — same lerp + parallax logic as before
+  tickerCb = () => {
+    scroll.target  = clamp(0, scroll.limit, scroll.target)
+    scroll.current += (scroll.target - scroll.current) * scroll.ease
+    setTrackX(-scroll.current)
+    applyParallax(setImageX)
+  }
+
+  wheelCb  = (e) => { scroll.target += e.deltaY }
+  resizeCb = ()  => { setLimit() }
+
+  gsap.ticker.add(tickerCb)
+  gsap.ticker.lagSmoothing(0)
+  window.addEventListener('wheel',  wheelCb,  { passive: true })
+  window.addEventListener('resize', resizeCb, { passive: true })
+})
 ```
 
-### Initialize
+> **Why store `tickerCb`, `wheelCb`, `resizeCb` in variables?**  
+> You need the same function reference to remove a listener. If you wrote  
+> `window.removeEventListener('wheel', (e) => {...})` it would do nothing  
+> because that's a brand new anonymous function, not the one you added.
+
+### onUnmounted — always clean up
 
 ```js
-setLimit()
+onUnmounted(() => {
+  gsap.ticker.remove(tickerCb)
+  window.removeEventListener('wheel',  wheelCb)
+  window.removeEventListener('resize', resizeCb)
+})
 ```
-
-**Checkpoint:** Refresh. Scrolling the mouse wheel should now move the gallery horizontally with a smooth ease. The parallax is still missing — images don't shift yet. That's next.
 
 ---
 
-## 8. Lesson 6 — The Parallax Effect
+## 9. Lesson 7 — The Parallax Effect
 
-Still in `main.js`. Add these two pieces.
+### applyParallax
 
-### Why quickSetter instead of gsap.set?
-
-```js
-/*
-  For a few elements, gsap.set(el, { x: val }) per frame is fine.
-  For multiple elements every frame, gsap.quickSetter is faster.
-
-  quickSetter(element, property, unit) returns a plain function.
-  Calling that function batches DOM writes and skips unnecessary overhead.
-
-  setTrackX(-300)  →  same as  gsap.set(track, { x: -300 })
-  setImageX[0](8)  →  same as  gsap.set(images[0], { x: '8%' })
-*/
-const setTrackX = gsap.quickSetter(track, 'x', 'px')
-const setImageX = Array.from(images).map(img => gsap.quickSetter(img, 'x', '%'))
-```
-
-Replace the `gsap.set(track, { x: -scroll.current })` line in your ticker with `setTrackX(-scroll.current)`.
-
-### The parallax calculation
+Define this function *before* `onMounted` — it receives `setImageX` as a parameter since that's created inside `onMounted`:
 
 ```js
-/*
-  MAX_SHIFT is the maximum image offset in % of its own width.
-
-  Safe limit from Lesson 2:
-    Extra buffer per side = 12.5% of card width
-    As % of image width (125% of card): 12.5 / 125 * 100 = 10%
-
-  Raise this above 10 and you'll see image edges — experiment to understand.
-*/
-const MAX_SHIFT = 10
-
-function applyParallax() {
+function applyParallax(setImageX) {
   const vw     = window.innerWidth
-  const center = vw * 0.5   // The midpoint of the viewport
+  const center = vw * 0.5
 
-  images.forEach((img, i) => {
+  imageRefs.forEach((img, i) => {
     const item = img.closest('.gallery__item')
     const rect = item.getBoundingClientRect()
 
     /*
-      getBoundingClientRect() gives the item's current position in the viewport.
-      This is accurate because it reflects the translateX we applied to the track.
-      No need to manually account for scroll — the DOM already reflects it.
+      getBoundingClientRect() reflects the translateX already applied to the track.
+      It gives the item's actual position in the viewport right now.
     */
 
-    // Skip items not currently visible — no point calculating parallax off-screen
+    // Skip items that are completely off-screen
     if (rect.right < 0 || rect.left > vw) return
 
-    // Center of this item relative to the viewport (in px)
+    // Where is this card's center relative to the viewport center?
     const itemCenter = rect.left + rect.width * 0.5
 
     /*
-      Normalize: express the item's position as a value from -1 to 1.
-        -1 → item center is at the LEFT edge of the viewport
-         0 → item center is at the CENTER of the viewport
-        +1 → item center is at the RIGHT edge of the viewport
+      Normalize to [-1, 1]:
+        -1 → card center at left edge of viewport
+         0 → card center at viewport center
+        +1 → card center at right edge of viewport
     */
-    const t = clamp(-1, 1, (itemCenter - center) / center)
+    const t     = clamp(-1, 1, (itemCenter - center) / center)
 
     /*
-      Counter-motion (the depth illusion):
-        Item moving RIGHT through viewport → image shifts LEFT
-        Item at center → image at 0 offset
-        Item moving LEFT through viewport → image shifts RIGHT
-
-      The image "lags behind" the card. Because they move at different rates,
-      your brain perceives them as being on different depth planes.
+      Counter-motion creates depth:
+        card moving right → image shifts left (negative shift)
+        card at center    → image at 0
+        card moving left  → image shifts right (positive shift)
     */
     const shift = -t * MAX_SHIFT
 
@@ -551,38 +618,34 @@ function applyParallax() {
 }
 ```
 
-### Call it inside the ticker
-
-Inside `gsap.ticker.add(...)`, after the `setTrackX` line, add:
-
-```js
-applyParallax()
-```
-
-Your full ticker should now look like this:
-
-```js
-gsap.ticker.add(() => {
-  scroll.target = clamp(0, scroll.limit, scroll.target)
-  scroll.current += (scroll.target - scroll.current) * scroll.ease
-  setTrackX(-scroll.current)
-  applyParallax()
-})
-```
-
-**Checkpoint:** Refresh. As you scroll, each image should visibly shift horizontally within its card. Images near the edges shift more than images near the center. That's the parallax.
+**Checkpoint:** Save the file. Vite hot-reloads instantly. Scrolling should now move the gallery horizontally with smooth ease, and each image should visibly shift within its card as it passes through the viewport.
 
 ---
 
-## 9. Lesson 7 — Wire Everything Up
+## 10. Lesson 8 — Wire Everything Up
 
-Here is the complete `main.js` for reference. Use it to check your work — don't copy it before writing your own.
+Here is the complete `GalleryParallax.vue`. Use it to verify your work — don't copy it before writing your own version.
 
-```js
-const wrapper = document.querySelector('.gallery__wrapper')
-const track   = document.querySelector('.gallery__track')
-const images  = document.querySelectorAll('.gallery__item img')
+```vue
+<script setup>
+import { ref, onMounted, onUnmounted } from 'vue'
+import gsap from 'gsap'
 
+// ── DOM refs ──────────────────────────────────────────────
+const wrapperRef = ref(null)
+const trackRef   = ref(null)
+const imageRefs  = []   // plain array — GSAP owns updates, not Vue
+
+// ── Image data ────────────────────────────────────────────
+const images = [
+  { src: '/images/Serene Sand Dunes.png',           alt: 'Serene Sand Dunes' },
+  { src: '/images/Serene Coastal Reflection.png',   alt: 'Serene Coastal Reflection' },
+  { src: '/images/Dramatic Mountain Landscape.png', alt: 'Dramatic Mountain Landscape' },
+  { src: '/images/Misty Tropical Rainforest.png',   alt: 'Misty Tropical Rainforest' },
+  { src: '/images/Abstract Cityscape Night.png',    alt: 'Abstract Cityscape Night' },
+]
+
+// ── Scroll state ──────────────────────────────────────────
 const clamp = gsap.utils.clamp
 
 const scroll = {
@@ -594,18 +657,16 @@ const scroll = {
 
 const MAX_SHIFT = 10
 
-const setTrackX = gsap.quickSetter(track, 'x', 'px')
-const setImageX = Array.from(images).map(img => gsap.quickSetter(img, 'x', '%'))
-
+// ── Helpers ───────────────────────────────────────────────
 function setLimit() {
-  scroll.limit = track.scrollWidth - wrapper.clientWidth
+  scroll.limit = trackRef.value.scrollWidth - wrapperRef.value.clientWidth
 }
 
-function applyParallax() {
+function applyParallax(setImageX) {
   const vw     = window.innerWidth
   const center = vw * 0.5
 
-  images.forEach((img, i) => {
+  imageRefs.forEach((img, i) => {
     const item = img.closest('.gallery__item')
     const rect = item.getBoundingClientRect()
 
@@ -619,40 +680,132 @@ function applyParallax() {
   })
 }
 
-gsap.ticker.add(() => {
-  scroll.target  = clamp(0, scroll.limit, scroll.target)
-  scroll.current += (scroll.target - scroll.current) * scroll.ease
-  setTrackX(-scroll.current)
-  applyParallax()
+// ── Lifecycle ─────────────────────────────────────────────
+let tickerCb
+let wheelCb
+let resizeCb
+
+onMounted(() => {
+  const setTrackX = gsap.quickSetter(trackRef.value, 'x', 'px')
+  const setImageX = imageRefs.map(img => gsap.quickSetter(img, 'x', '%'))
+
+  setLimit()
+
+  tickerCb = () => {
+    scroll.target  = clamp(0, scroll.limit, scroll.target)
+    scroll.current += (scroll.target - scroll.current) * scroll.ease
+    setTrackX(-scroll.current)
+    applyParallax(setImageX)
+  }
+
+  wheelCb  = (e) => { scroll.target += e.deltaY }
+  resizeCb = ()  => { setLimit() }
+
+  gsap.ticker.add(tickerCb)
+  gsap.ticker.lagSmoothing(0)
+  window.addEventListener('wheel',  wheelCb,  { passive: true })
+  window.addEventListener('resize', resizeCb, { passive: true })
 })
 
-gsap.ticker.lagSmoothing(0)
+onUnmounted(() => {
+  gsap.ticker.remove(tickerCb)
+  window.removeEventListener('wheel',  wheelCb)
+  window.removeEventListener('resize', resizeCb)
+})
+</script>
 
-window.addEventListener('wheel', (e) => {
-  scroll.target += e.deltaY
-}, { passive: true })
+<template>
+  <div class="gallery__wrapper" ref="wrapperRef">
+    <div class="gallery__track" ref="trackRef">
+      <div
+        v-for="(image, i) in images"
+        :key="i"
+        class="gallery__item"
+      >
+        <img
+          :ref="el => { if (el) imageRefs[i] = el }"
+          :src="image.src"
+          :alt="image.alt"
+          draggable="false"
+        />
+      </div>
+    </div>
+  </div>
+</template>
 
-window.addEventListener('resize', () => {
-  setLimit()
-}, { passive: true })
+<style scoped>
+.gallery__wrapper {
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+}
 
-setLimit()
+.gallery__track {
+  display: flex;
+  gap: 1.5rem;
+  padding: 0 5vw;
+  will-change: transform;
+}
+
+.gallery__item {
+  flex-shrink: 0;
+  width: 38vw;
+  height: 58vh;
+  overflow: hidden;
+  border-radius: 6px;
+}
+
+.gallery__item img {
+  display: block;
+  width: 125%;
+  height: 100%;
+  margin-left: -12.5%;
+  object-fit: cover;
+  will-change: transform;
+  pointer-events: none;
+  user-select: none;
+}
+</style>
+```
+
+### `src/App.vue`
+
+```vue
+<script setup>
+import GalleryParallax from './components/GalleryParallax.vue'
+</script>
+
+<template>
+  <GalleryParallax />
+</template>
+```
+
+### `src/main.js`
+
+```js
+import { createApp } from 'vue'
+import './styles/global.css'
+import App from './App.vue'
+
+createApp(App).mount('#app')
 ```
 
 ---
 
-## 10. Tuning Reference
+## 11. Tuning Reference
 
 Once it's working, experiment with these values to understand how they interact.
 
 | Variable | File | What it does |
 |---|---|---|
-| `scroll.ease` | `main.js` | Lerp speed. `0.03` = dreamy glide, `0.15` = snappy |
-| `MAX_SHIFT` | `main.js` | Parallax intensity. Max safe value = `10` with current CSS |
-| `width: 125%` | `style.css` | Image buffer size. Increase for stronger parallax room |
-| `margin-left: -12.5%` | `style.css` | Must always equal `-(width - 100%) / 2` |
-| `gap` | `style.css` | Space between cards |
-| `width: 38vw` | `style.css` | Card width |
+| `scroll.ease` | `GalleryParallax.vue` | Lerp speed. `0.03` = dreamy glide, `0.15` = snappy |
+| `MAX_SHIFT` | `GalleryParallax.vue` | Parallax intensity. Max safe value = `10` with current CSS |
+| `width: 125%` | `<style scoped>` | Image buffer size. Increase for stronger parallax room |
+| `margin-left: -12.5%` | `<style scoped>` | Must always equal `-(width - 100%) / 2` |
+| `gap` | `<style scoped>` | Space between cards |
+| `width: 38vw` | `<style scoped>` | Card width |
 
 **The buffer triangle — always keep these in sync:**
 
@@ -666,4 +819,10 @@ Example with W = 130:
   max safe shift:  15/130*100 ≈ 11.5%
 ```
 
-Break the rules intentionally — set `MAX_SHIFT = 20` and watch the edges appear. That's how you learn where the boundaries are.
+Break the rules intentionally — set `MAX_SHIFT = 20` and watch the edges appear. That's how you learn where the boundaries sit.
+
+**Vue-specific things to try next:**
+
+- Extract the scroll + parallax logic into a composable `src/composables/useParallaxScroll.js` and call it with `useParallaxScroll(wrapperRef, trackRef, imageRefs)` — keeps the component lean
+- Add a `props` declaration for `ease` and `maxShift` so the gallery is configurable from the parent
+- Pass the `images` array in as a prop — makes the component reusable across multiple pages
