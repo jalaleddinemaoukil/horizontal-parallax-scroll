@@ -1,11 +1,7 @@
-<script setup></script>
+<script setup>
+import GalleryParallax from './components/GalleryParallax.vue'
+</script>
 
 <template>
-  <h1>You did it!</h1>
-  <p>
-    Visit <a href="https://vuejs.org/" target="_blank" rel="noopener">vuejs.org</a> to read the
-    documentation
-  </p>
+  <GalleryParallax />
 </template>
-
-<style scoped></style>
