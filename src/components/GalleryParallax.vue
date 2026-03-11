@@ -14,6 +14,11 @@ const images = [
   { src: '/images/Dramatic Mountain Landscape.png', alt: 'Dramatic Mountain Landscape' },
   { src: '/images/Misty Tropical Rainforest.png',   alt: 'Misty Tropical Rainforest' },
   { src: '/images/Abstract Cityscape Night.png',    alt: 'Abstract Cityscape Night' },
+  { src: '/images/Serene Sand Dunes.png',           alt: 'Serene Sand Dunes' },
+  { src: '/images/Serene Coastal Reflection.png',   alt: 'Serene Coastal Reflection' },
+  { src: '/images/Dramatic Mountain Landscape.png', alt: 'Dramatic Mountain Landscape' },
+  { src: '/images/Misty Tropical Rainforest.png',   alt: 'Misty Tropical Rainforest' },
+  { src: '/images/Abstract Cityscape Night.png',    alt: 'Abstract Cityscape Night' },
 ]
 
 // ── Scroll state ──────────────────────────────────────────
